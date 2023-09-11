@@ -35,15 +35,16 @@
             name = "lean4";
             buildInputs = with pkgs; [
               rsync
-              libgcc.lib
               stdenv.cc.cc.lib
-              glibc
               findutils
               file
+            ] ++ lib.lists.optionals stdenv.hostPlatform.isLinux [
+              libgcc.lib
+              glibc
             ];
             nativeBuildInputs = with pkgs;
-              lib.optional stdenv.hostPlatform.isLinux pkgs.autoPatchelfHook;
-            #   ++ lib.optional stdenv.hostPlatform.isDarwin fixDarwinDylibNames;
+              lib.optional stdenv.hostPlatform.isLinux pkgs.autoPatchelfHook
+               ++ lib.optional stdenv.hostPlatform.isDarwin fixDarwinDylibNames;
             src = pkgs.fetchzip {
               url = "https://github.com/leanprover/lean4/releases/download/v${binary.version}/lean-${binary.version}-${binary.systemName}.zip";
               hash = binary.hash;
@@ -53,15 +54,15 @@
               mkdir -p $out
               rsync -a . $out/
             '';
-            doDist = true;
-            distPhase = with pkgs;
+            postFixup = with pkgs;
+              lib.strings.optionalString stdenv.hostPlatform.isDarwin ''
+                echo "no patching in Darwin"
+              '' +
               lib.strings.optionalString stdenv.hostPlatform.isLinux ''
                 find $out -type f -exec file {} \; | grep ELF \
                   | cut -d: -f1 | grep -v '\.o$' \
-                  | tee foo \
                   | xargs patchelf --add-rpath "${stdenv.cc.cc.lib}/lib:${glibc}/lib"
-                echo ">>> ${stdenv.cc.cc.lib}/lib:${glibc}/lib"
-                cat foo
+                echo "Patchelf done"
               '';
           };
           vscode-lean4 = pkgs.vscode-utils.extensionFromVscodeMarketplace {
