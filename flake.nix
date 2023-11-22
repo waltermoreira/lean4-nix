@@ -84,11 +84,17 @@
               vscode-lean4
             ];
             extraSettings = {
-              "lean4.toolchainPath" = "${pkg.lean-package}";
+              "lean4.toolchainPath" = "${lean4}";
             };
           };
         in
         {
           packages.default = lean4;
+          devShells.default = myShell {
+            packages = [
+              lean4
+              vscode
+            ];
+          };
         });
 }
