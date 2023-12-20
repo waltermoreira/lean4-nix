@@ -21,14 +21,14 @@
           };
           binary = {
             "x86_64-linux" = {
-              version = "4.0.0";
+              version = "4.4.0-rc1";
               systemName = "linux";
-              hash = "sha256-CgExdbupzc8gsVImvucda7LUcnd1RIdXRakkQtsQB6o=";
+              hash = "sha256-ze5jmATKW4uGWA2S96Nb85qNryq3sUJBU2mC9Z6PVQo=";
             };
             "x86_64-darwin" = {
-              version = "4.0.0";
+              version = "4.4.0-rc1";
               systemName = "darwin";
-              hash = "sha256-+bgbXjQElwHDmwNwwRR+TpCxFeRvFoK80j5wfTOMijI=";
+              hash = "sha256-2RrzllXPupyk2fWfwiRGiZ12D6iifMQ7kQjuQ8J7APA=";
             };
           }.${system};
           lean4 = pkgs.stdenv.mkDerivation {
