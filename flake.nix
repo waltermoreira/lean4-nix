@@ -21,9 +21,9 @@
           };
           binary = {
             "x86_64-linux" = {
-              version = "4.4.0-rc1";
+              version = "4.3.0";
               systemName = "linux";
-              hash = "sha256-ze5jmATKW4uGWA2S96Nb85qNryq3sUJBU2mC9Z6PVQo=";
+              hash = "sha256-sxxkG6koycrrSAEeoHRQNkK/OUudxV4fqqghLt99lz4=";
             };
             "x86_64-darwin" = {
               version = "4.4.0-rc1";
@@ -68,7 +68,10 @@
                 find $out -type f -exec file {} \; | grep ELF \
                   | cut -d: -f1 | grep -v '\.o$' \
                   | xargs patchelf --set-rpath \
-                  "${stdenv.cc.cc.lib}/lib:${glibc}/lib:${zlib}/lib:${libcxx}/lib:${libcxxabi}/lib:${llvmPackages_15.libllvm.lib}/lib:${llvmPackages_15.libunwind}/lib:"'$ORIGIN/../lib/lean'
+                  "${stdenv.cc.cc.lib}/lib:${glibc}/lib:${zlib}/lib:${libcxx}/lib:${libcxxabi}/lib:${llvmPackages_15.libllvm.lib}/lib:${llvmPackages_15.libunwind}/lib:"'$ORIGIN/../lib:$ORIGIN/../lib/lean' 
+                find $out -type f -exec file {} \; | grep ELF | grep interpreter \
+                  | cut -d: -f1 \
+                  | xargs patchelf --set-interpreter "${stdenv.cc.bintools.dynamicLinker}"
                 echo "Patchelf done in Linux"
               '';
           };
