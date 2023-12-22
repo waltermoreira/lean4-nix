@@ -2,7 +2,7 @@
   description = "Lean 4";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/6b70761ea8c896aff8994eb367d9526686501860";
+    nixpkgs.url = "github:nixos/nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
     shell-utils.url = "github:waltermoreira/shell-utils";
     myvscode.url = "github:waltermoreira/myvscode";
@@ -21,14 +21,16 @@
           };
           binary = {
             "x86_64-linux" = {
-              version = "4.3.0";
+              version = "4.4.0";
               systemName = "linux";
-              hash = "sha256-sxxkG6koycrrSAEeoHRQNkK/OUudxV4fqqghLt99lz4=";
+              arch = "";
+              hash = "sha256-jToCykYMdCWbo8/xec6WFAXfUTYDVgQph/hTQJ/Hii4=";
             };
             "x86_64-darwin" = {
-              version = "4.4.0-rc1";
+              version = "4.4.0";
               systemName = "darwin";
-              hash = "sha256-2RrzllXPupyk2fWfwiRGiZ12D6iifMQ7kQjuQ8J7APA=";
+              arch = "";
+              hash = "sha256-IdTSHX9O/SmU+WZJknrboEtY4WfCP9BbCwQHQxTkh9I=";
             };
           }.${system};
           lean4 = pkgs.stdenv.mkDerivation {
@@ -44,7 +46,7 @@
               [ ] ++
               lib.optional stdenv.hostPlatform.isDarwin fixDarwinDylibNames;
             src = pkgs.fetchzip {
-              url = "https://github.com/leanprover/lean4/releases/download/v${binary.version}/lean-${binary.version}-${binary.systemName}.zip";
+              url = "https://github.com/leanprover/lean4/releases/download/v${binary.version}/lean-${binary.version}-${binary.systemName}${binary.arch}.zip";
               hash = binary.hash;
             };
             dontBuild = true;
@@ -65,14 +67,20 @@
                 echo "install_name_tool done in Darwin"
               '' +
               lib.strings.optionalString stdenv.hostPlatform.isLinux ''
-                find $out -type f -exec file {} \; | grep ELF \
+                find $out/bin -type f -exec file {} \; | grep ELF \
                   | cut -d: -f1 | grep -v '\.o$' \
                   | xargs patchelf --set-rpath \
-                  "${stdenv.cc.cc.lib}/lib:${glibc}/lib:${zlib}/lib:${libcxx}/lib:${libcxxabi}/lib:${llvmPackages_15.libllvm.lib}/lib:${llvmPackages_15.libunwind}/lib:"'$ORIGIN/../lib:$ORIGIN/../lib/lean' 
-                find $out -type f -exec file {} \; | grep ELF | grep interpreter \
+                  "${stdenv.cc.cc.lib}/lib:${glibc}/lib:${libcxx}/lib:${libcxxabi}/lib:${llvmPackages_15.libllvm.lib}/lib:${llvmPackages_15.libunwind}/lib:${llvmPackages_15.clang-unwrapped.lib}/lib:"'$ORIGIN/../lib:$ORIGIN/../lib/lean'
+                patchelf \
+                  --set-rpath "${stdenv.cc.cc.lib}/lib:${glibc}/lib:${libcxx}/lib:"'$ORIGIN/..:$ORIGIN' \
+                  $out/lib/lean/libleanshared.so
+                find $out/bin -type f -exec file {} \; | grep ELF \
                   | cut -d: -f1 \
                   | xargs patchelf --set-interpreter "${stdenv.cc.bintools.dynamicLinker}"
                 echo "Patchelf done in Linux"
+                ln -sf ${llvmPackages_15.libllvm}/bin/llvm-ar $out/bin
+                ln -sf ${clang_15}/bin/clang $out/bin
+                ln -sf ${lld_15}/bin/ld.lld $out/bin
               '';
           };
           vscode-lean4 = pkgs.vscode-utils.extensionFromVscodeMarketplace {
