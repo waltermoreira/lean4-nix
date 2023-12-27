@@ -15,24 +15,53 @@
     ]
       (system:
         let
+          leanVersion = "4.4.0";
+          elanVersion = "3.0.0";
           pkgs = import nixpkgs {
             inherit system;
             config.allowUnfree = true;
           };
           binary = {
             "x86_64-linux" = {
-              version = "4.4.0";
+              version = leanVersion;
               systemName = "linux";
               arch = "";
               hash = "sha256-jToCykYMdCWbo8/xec6WFAXfUTYDVgQph/hTQJ/Hii4=";
             };
             "x86_64-darwin" = {
-              version = "4.4.0";
+              version = leanVersion;
               systemName = "darwin";
               arch = "";
               hash = "sha256-IdTSHX9O/SmU+WZJknrboEtY4WfCP9BbCwQHQxTkh9I=";
             };
           }.${system};
+          elan_binary = {
+            "x86_64-linux" = {
+              version = elanVersion;
+              systemName = "unknown-linux-gnu";
+              arch = "x86_64";
+              hash = "sha256-p4KPgU0tJTo2fQdXwCZqviQQflsd432FnCu2pzekWfc=";
+            };
+            "x86_64-darwin" = {
+              version = elanVersion;
+              systemName = "apple-darwin";
+              arch = "x86_64";
+              hash = "";
+            };
+          }.${system};
+          toolchain = "leanprover--lean4---v${binary.version}";
+          toolchainsPath = "bin/toolchains/${toolchain}";
+          elan = pkgs.stdenv.mkDerivation {
+            name = "elan";
+            src = pkgs.fetchzip {
+              url = "https://github.com/leanprover/elan/releases/download/v${elan_binary.version}/elan-${elan_binary.arch}-${elan_binary.systemName}.tar.gz";
+              hash = elan_binary.hash;
+            };
+            installPhase = with pkgs; ''
+              mkdir -p $out/bin
+              cp elan-init $out/bin/elan
+            '';
+          };
           lean4 = pkgs.stdenv.mkDerivation {
             name = "lean4";
             buildInputs = with pkgs; [
@@ -43,7 +72,7 @@
               stdenv.cc.cc.lib
             ];
             nativeBuildInputs = with pkgs;
-              [ ] ++
+              [ makeWrapper ] ++
               lib.optional stdenv.hostPlatform.isDarwin fixDarwinDylibNames;
             src = pkgs.fetchzip {
               url = "https://github.com/leanprover/lean4/releases/download/v${binary.version}/lean-${binary.version}-${binary.systemName}${binary.arch}.zip";
@@ -51,13 +80,14 @@
             };
             dontBuild = true;
             installPhase = with pkgs; ''
-              mkdir -p $out
-              rsync -a . $out/
+              mkdir -p $out/${toolchainsPath}
+              mkdir -p $out/{bin/update-hashes,_unwrapped}
+              rsync -a . $out/${toolchainsPath}
             '';
             doDist = true;
             distPhase = with pkgs;
               lib.strings.optionalString stdenv.hostPlatform.isDarwin ''
-                for exe in $(find $out -type f -exec file {} \; | grep Mach-O \
+                for exe in $(find $out/${toolchainsPath} -type f -exec file {} \; | grep Mach-O \
                   | cut -d: -f1 | grep -v '\.a$'); do 
                   install_name_tool \
                     -change "@rpath/libc++abi.1.dylib" "${libcxxabi}/lib/libc++abi.1.dylib" \
@@ -67,20 +97,35 @@
                 echo "install_name_tool done in Darwin"
               '' +
               lib.strings.optionalString stdenv.hostPlatform.isLinux ''
-                find $out/bin -type f -exec file {} \; | grep ELF \
+                find $out/${toolchainsPath}/bin -type f -exec file {} \; | grep ELF \
                   | cut -d: -f1 | grep -v '\.o$' \
                   | xargs patchelf --set-rpath \
                   "${stdenv.cc.cc.lib}/lib:${glibc}/lib:${libcxx}/lib:${libcxxabi}/lib:${llvmPackages_15.libllvm.lib}/lib:${llvmPackages_15.libunwind}/lib:${llvmPackages_15.clang-unwrapped.lib}/lib:"'$ORIGIN/../lib:$ORIGIN/../lib/lean'
                 patchelf \
                   --set-rpath "${stdenv.cc.cc.lib}/lib:${glibc}/lib:${libcxx}/lib:"'$ORIGIN/..:$ORIGIN' \
-                  $out/lib/lean/libleanshared.so
-                find $out/bin -type f -exec file {} \; | grep ELF \
+                  $out/${toolchainsPath}/lib/lean/libleanshared.so
+                find $out/${toolchainsPath}/bin -type f -exec file {} \; | grep ELF \
                   | cut -d: -f1 \
                   | xargs patchelf --set-interpreter "${stdenv.cc.bintools.dynamicLinker}"
                 echo "Patchelf done in Linux"
-                ln -sf ${llvmPackages_15.libllvm}/bin/llvm-ar $out/bin
-                ln -sf ${clang_15}/bin/clang $out/bin
-                ln -sf ${lld_15}/bin/ld.lld $out/bin
+                ln -sf ${llvmPackages_15.libllvm}/bin/llvm-ar $out/${toolchainsPath}/bin
+                ln -sf ${llvmPackages_15.clangUseLLVM}/bin/clang $out/${toolchainsPath}/bin
+                ln -sf ${llvmPackages_15.bintools}/bin/ld.lld $out/${toolchainsPath}/bin
+              '' + ''
+                for binary in elan lake lean leanc leanchecker leanmake leanpkg; do
+                  cp ${elan}/bin/elan $out/_unwrapped/$binary
+                  makeWrapper $out/_unwrapped/$binary $out/bin/$binary \
+                    --set-default ELAN_HOME $out/bin \
+                    --prefix PATH : $out/${toolchainsPath}/bin
+                done
+                echo -n "https://github.com/leanprover/lean4/releases/expanded_assets/v${binary.version}" >$out/bin/update-hashes/${toolchain}
+                cat <<EOF >$out/bin/settings.toml
+                default_toolchain = "${toolchain}"
+                telemetry = false
+                version = "12"
+
+                [overrides]
+                EOF
               '';
           };
           vscode-lean4 = pkgs.vscode-utils.extensionFromVscodeMarketplace {
