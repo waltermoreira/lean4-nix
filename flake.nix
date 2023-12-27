@@ -2,7 +2,7 @@
   description = "Lean 4";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs";
+    nixpkgs.url = "github:nixos/nixpkgs/23.11";
     flake-utils.url = "github:numtide/flake-utils";
     shell-utils.url = "github:waltermoreira/shell-utils";
     myvscode.url = "github:waltermoreira/myvscode";
@@ -46,7 +46,7 @@
               version = elanVersion;
               systemName = "apple-darwin";
               arch = "x86_64";
-              hash = "";
+              hash = "sha256-KdeUxzf9+xB4+Jsbl9TC7BkfnqRFdXH3W/SeUWzEwfA=";
             };
           }.${system};
           toolchain = "leanprover--lean4---v${binary.version}";
@@ -72,8 +72,7 @@
               stdenv.cc.cc.lib
             ];
             nativeBuildInputs = with pkgs;
-              [ makeWrapper ] ++
-              lib.optional stdenv.hostPlatform.isDarwin fixDarwinDylibNames;
+              [ makeWrapper ];
             src = pkgs.fetchzip {
               url = "https://github.com/leanprover/lean4/releases/download/v${binary.version}/lean-${binary.version}-${binary.systemName}${binary.arch}.zip";
               hash = binary.hash;
@@ -86,16 +85,6 @@
             '';
             doDist = true;
             distPhase = with pkgs;
-              lib.strings.optionalString stdenv.hostPlatform.isDarwin ''
-                for exe in $(find $out/${toolchainsPath} -type f -exec file {} \; | grep Mach-O \
-                  | cut -d: -f1 | grep -v '\.a$'); do 
-                  install_name_tool \
-                    -change "@rpath/libc++abi.1.dylib" "${libcxxabi}/lib/libc++abi.1.dylib" \
-                    -change "@rpath/libunwind.1.dylib" "${llvmPackages_15.libunwind}/lib/libunwind.1.dylib" \
-                    $exe
-                done
-                echo "install_name_tool done in Darwin"
-              '' +
               lib.strings.optionalString stdenv.hostPlatform.isLinux ''
                 find $out/${toolchainsPath}/bin -type f -exec file {} \; | grep ELF \
                   | cut -d: -f1 | grep -v '\.o$' \
