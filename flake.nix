@@ -116,7 +116,8 @@
                   cp ${elan}/bin/elan $out/_unwrapped/$binary
                   makeWrapper $out/_unwrapped/$binary $out/bin/$binary \
                     --set-default ELAN_HOME $out/bin \
-                    --prefix PATH : $out/${toolchainsPath}/bin
+                    --prefix PATH : $out/${toolchainsPath}/bin \
+                    --prefix PATH : $out/bin
                 done
                 echo -n "https://github.com/leanprover/lean4/releases/expanded_assets/v${binary.version}" >$out/bin/update-hashes/${toolchain}
                 cat <<EOF >$out/bin/settings.toml
