@@ -15,8 +15,8 @@
     ]
       (system:
         let
-          leanVersion = "4.4.0";
-          elanVersion = "3.0.0";
+          leanVersion = "4.8.0";
+          elanVersion = "3.1.1";
           pkgs = import nixpkgs {
             inherit system;
             config.allowUnfree = true;
@@ -26,13 +26,13 @@
               version = leanVersion;
               systemName = "linux";
               arch = "";
-              hash = "sha256-jToCykYMdCWbo8/xec6WFAXfUTYDVgQph/hTQJ/Hii4=";
+              hash = "sha256-1ga0bltsXJbDGNf0gs3zhK6d/1IMs6DxlWzdaTM+F1c=";
             };
             "x86_64-darwin" = {
               version = leanVersion;
               systemName = "darwin";
               arch = "";
-              hash = "sha256-IdTSHX9O/SmU+WZJknrboEtY4WfCP9BbCwQHQxTkh9I=";
+              hash = "sha256-1iQMNqXsZWLFenrV6VPXgC8bGs6E/w8GxlvoLZEzebg=";
             };
           }.${system};
           elan_binary = {
@@ -40,13 +40,13 @@
               version = elanVersion;
               systemName = "unknown-linux-gnu";
               arch = "x86_64";
-              hash = "sha256-p4KPgU0tJTo2fQdXwCZqviQQflsd432FnCu2pzekWfc=";
+              hash = "sha256-jAqwELrbngsMLopxVxcJFhVL5i8p6Gcqb8nTPdThx5U=";
             };
             "x86_64-darwin" = {
               version = elanVersion;
               systemName = "apple-darwin";
               arch = "x86_64";
-              hash = "sha256-KdeUxzf9+xB4+Jsbl9TC7BkfnqRFdXH3W/SeUWzEwfA=";
+              hash = "sha256-4PN70RaoEXdr+cWt7Hla5pzC2a0FWJGGxwGjD7GB9/I=";
             };
           }.${system};
           toolchain = "leanprover--lean4---v${binary.version}";
@@ -85,6 +85,7 @@
             '';
             doDist = true;
             distPhase = with pkgs;
+              # For Linux
               lib.strings.optionalString stdenv.hostPlatform.isLinux ''
                 find $out/${toolchainsPath}/bin -type f -exec file {} \; | grep ELF \
                   | cut -d: -f1 | grep -v '\.o$' \
@@ -100,7 +101,13 @@
                 ln -sf ${llvmPackages_15.libllvm}/bin/llvm-ar $out/${toolchainsPath}/bin
                 ln -sf ${llvmPackages_15.clangUseLLVM}/bin/clang $out/${toolchainsPath}/bin
                 ln -sf ${llvmPackages_15.bintools}/bin/ld.lld $out/${toolchainsPath}/bin
-              '' + ''
+              '' +
+              # For Darwin
+              # lib.strings.optionalString stdenv.hostPlatform.isDarwin ''
+              #   install_name_tool -add_rpath $out/${toolchainsPath}/lib/lean $out/${toolchainsPath}/lib/lean/libInit_shared.dylib
+              # '' +
+              # For everyone
+              ''
                 for binary in elan lake lean leanc leanchecker leanmake leanpkg; do
                   cp ${elan}/bin/elan $out/_unwrapped/$binary
                   makeWrapper $out/_unwrapped/$binary $out/bin/$binary \
@@ -133,9 +140,23 @@
               "lean4.toolchainPath" = "${lean4}";
             };
           };
+          myfod = pkgs.stdenv.mkDerivation {
+            name = "fod";
+            src = ./.;
+            buildInputs = [ pkgs.curl pkgs.cacert ];
+            buildPhase = ''
+              mkdir -p $out
+              curl -X GET "https://httpbin.org/get" -H  "accept: application/json" > $out/foo
+            '';
+            outputHashMode = "recursive";
+            outputHashAlgo = "sha256";
+            outputHash = "sha256-OerO4cbDSu2pKF9OVsAkFZQcI1OsMdBmLLyrNfw3nTs=";
+          };
         in
         {
           packages.default = lean4;
+          packages.fod = myfod;
+          packages.elan = elan;
           devShells.default = myShell {
             packages = [
               lean4
